@@ -195,103 +195,43 @@ def test__remove_unlisted_plugins_error(
         jenkins_charm._reconcile_plugins(harness_container.container, dummy_state)
 
 
-def test__remove_unlisted_plugins(
-    harness_container: HarnessWithContainer, monkeypatch: pytest.MonkeyPatch
-):
-    """
-    arrange: given a charm and monkeypatched remove_unlisted_plugins that succeeds.
-    act: when _reconcile_plugins is called.
-    assert: remove_unlisted_plugins is called without error.
-    """
-    mock_datetime = MagicMock(spec=datetime.datetime)
-    mock_datetime.utcnow.return_value = datetime.datetime(2023, 1, 1, 12)
-    monkeypatch.setattr(timerange, "datetime", mock_datetime)
-    harness_container.harness.update_config({"restart-time-range": "02-22"})
-    with patch.object(jenkins.Jenkins, "remove_unlisted_plugins") as remove_mock:
-        harness_container.harness.begin()
-
-        jenkins_charm = typing.cast(JenkinsK8sOperatorCharm, harness_container.harness.charm)
-        dummy_state = state.State.from_charm(jenkins_charm)
-        jenkins_charm._reconcile_plugins(harness_container.container, dummy_state)
-
-        remove_mock.assert_called_once()
-
-
-def test__on_update_status_not_in_time_range(
-    harness_container: HarnessWithContainer, monkeypatch: pytest.MonkeyPatch
-):
-    """
-    arrange: given a charm with restart-time-range 0-23 and monkeypatched datetime with hour 23.
-    act: when _reconcile_plugins is called directly.
-    assert: remove_unlisted_plugins is not called since we're outside the time range.
-    """
-    mock_datetime = MagicMock(spec=datetime.datetime)
-    mock_datetime.utcnow.return_value = datetime.datetime(2023, 1, 1, 23)
-    monkeypatch.setattr(timerange, "datetime", mock_datetime)
-    harness_container.harness.update_config({"restart-time-range": "00-23"})
-    harness_container.harness.begin()
-
-    jenkins_charm = typing.cast(JenkinsK8sOperatorCharm, harness_container.harness.charm)
-    dummy_state = state.State.from_charm(jenkins_charm)
-    with patch.object(jenkins.Jenkins, "remove_unlisted_plugins") as remove_unlisted_plugins_mock:
-        jenkins_charm._reconcile_plugins(harness_container.container, dummy_state)
-
-        remove_unlisted_plugins_mock.assert_not_called()
-
-
-# pylint doesn't quite understand walrus operators
-# pylint: disable=unused-variable,undefined-variable,too-many-locals
 @pytest.mark.parametrize(
-    "exception, log_message",
+    "hour, time_range, expect_called",
     [
-        pytest.param(
-            jenkins.JenkinsPluginError("plugin err"),
-            "Failed to remove unlisted plugin",
-            id="Failed plugin remove status.",
-        ),
-        pytest.param(
-            jenkins.JenkinsError("jenkins err"),
-            "Failed to remove unlisted plugin",
-            id="Failed plugin remove status (blocked status).",
-        ),
-        pytest.param(
-            TimeoutError("timeout"),
-            "Failed to remove plugins",
-            id="Failed plugin remove status (maintenance status).",
-        ),
-        pytest.param(
-            jenkins.JenkinsPluginError("plugin err 2"),
-            "Failed to remove unlisted plugin",
-            id="Failed update jenkins status (waiting status).",
-        ),
-        pytest.param(
-            jenkins.JenkinsError("jenkins err 2"),
-            "Failed to remove unlisted plugin",
-            id="Both failed (active status)",
-        ),
+        pytest.param(12, "02-22", True, id="inside time range"),
+        pytest.param(23, "00-23", False, id="outside time range"),
     ],
 )
-# pylint: enable=unused-variable,undefined-variable,too-many-locals
-def test__on_update_status(
+def test_reconcile_plugins_time_range(
     harness_container: HarnessWithContainer,
     monkeypatch: pytest.MonkeyPatch,
-    exception: Exception,
-    log_message: str,
+    hour: int,
+    time_range: str,
+    expect_called: bool,
 ):
     """
-    arrange: given patched remove_unlisted_plugins that raises an exception.
+    arrange: given a charm with a restart-time-range config and monkeypatched datetime.
     act: when _reconcile_plugins is called.
-    assert: no unhandled exception is raised (error is logged internally).
+    assert: remove_unlisted_plugins is called only when within the time range.
     """
+    mock_datetime = MagicMock(spec=datetime.datetime)
+    mock_datetime.utcnow.return_value = datetime.datetime(2023, 1, 1, hour)
+    monkeypatch.setattr(timerange, "datetime", mock_datetime)
+    harness_container.harness.update_config({"restart-time-range": time_range})
     harness_container.harness.begin()
 
     jenkins_charm = typing.cast(JenkinsK8sOperatorCharm, harness_container.harness.charm)
     dummy_state = state.State.from_charm(jenkins_charm)
-
-    with patch.object(jenkins.Jenkins, "remove_unlisted_plugins") as mock_remove:
-        mock_remove.side_effect = exception
-        # Should not raise - errors are caught and logged
+    with patch.object(jenkins.Jenkins, "remove_unlisted_plugins") as remove_mock:
         jenkins_charm._reconcile_plugins(harness_container.container, dummy_state)
+
+        if expect_called:
+            remove_mock.assert_called_once()
+        else:
+            remove_mock.assert_not_called()
+
+
+
 
 
 def test_calculate_env(harness: Harness):
