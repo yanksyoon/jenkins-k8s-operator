@@ -337,49 +337,38 @@ def test_jcasc_config_from_charm(mock_charm: MagicMock):
     assert result.jcasc_config == {"jenkins": {"systemMessage": "test"}}
 
 
-def test_jcasc_config_default(mock_charm: MagicMock):
+@pytest.mark.parametrize(
+    "config, expected, error_match",
+    [
+        pytest.param({}, None, None, id="no jcasc-config key"),
+        pytest.param({"jcasc-config": "   "}, None, None, id="whitespace-only"),
+        pytest.param(
+            {"jcasc-config": "{{invalid: yaml: [["},
+            None,
+            "Invalid jcasc-config YAML",
+            id="invalid YAML",
+        ),
+        pytest.param(
+            {"jcasc-config": "- item1\n- item2"},
+            None,
+            "YAML mapping",
+            id="non-dict YAML",
+        ),
+    ],
+)
+def test_jcasc_config_invalid(
+    mock_charm: MagicMock, config: dict, expected: typing.Optional[dict], error_match: typing.Optional[str]
+):
     """
-    arrange: given a charm with no explicit jcasc-config.
+    arrange: given a charm with various jcasc-config values.
     act: when state is initialized from charm.
-    assert: jcasc_config is None.
+    assert: jcasc_config is None or CharmConfigInvalidError is raised.
     """
-    mock_charm.config = {}
+    mock_charm.config = config
 
-    result = state.State.from_charm(mock_charm)
-    assert result.jcasc_config is None
-
-
-def test_jcasc_config_empty(mock_charm: MagicMock):
-    """
-    arrange: given a charm with whitespace-only jcasc-config.
-    act: when state is initialized from charm.
-    assert: jcasc_config is None.
-    """
-    mock_charm.config = {"jcasc-config": "   "}
-
-    result = state.State.from_charm(mock_charm)
-    assert result.jcasc_config is None
-
-
-def test_jcasc_config_invalid_yaml(mock_charm: MagicMock):
-    """
-    arrange: given a charm with invalid YAML in jcasc-config.
-    act: when state is initialized from charm.
-    assert: CharmConfigInvalidError is raised.
-    """
-    mock_charm.config = {"jcasc-config": "{{invalid: yaml: [["}
-
-    with pytest.raises(state.CharmConfigInvalidError, match="Invalid jcasc-config YAML"):
-        state.State.from_charm(mock_charm)
-
-
-def test_jcasc_config_non_dict(mock_charm: MagicMock):
-    """
-    arrange: given a charm with YAML list (not dict) in jcasc-config.
-    act: when state is initialized from charm.
-    assert: CharmConfigInvalidError is raised.
-    """
-    mock_charm.config = {"jcasc-config": "- item1\n- item2"}
-
-    with pytest.raises(state.CharmConfigInvalidError, match="YAML mapping"):
-        state.State.from_charm(mock_charm)
+    if error_match:
+        with pytest.raises(state.CharmConfigInvalidError, match=error_match):
+            state.State.from_charm(mock_charm)
+    else:
+        result = state.State.from_charm(mock_charm)
+        assert result.jcasc_config is expected
