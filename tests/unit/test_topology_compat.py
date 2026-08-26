@@ -3,9 +3,9 @@
 
 """Backwards-compatibility tests for mixed legacy/direct server topologies.
 
-Legacy Traefik ingress (with or without oauth2-proxy via auth-proxy) must keep
-working while the direct HAProxy server route is introduced, and the server
-ingress and agent-discovery ingress must be independently providable.
+Legacy Traefik ingress must keep working while the direct HAProxy server route
+is introduced, and the server ingress and agent-discovery ingress must be
+independently providable.
 """
 
 from unittest.mock import MagicMock
@@ -17,7 +17,6 @@ from charm import JenkinsK8sOperatorCharm
 from state import (
     AGENT_DISCOVERY_INGRESS_RELATION_NAME,
     AGENT_RELATION,
-    AUTH_PROXY_RELATION,
     HAPROXY_ROUTE_RELATION_NAME,
     INGRESS_RELATION_NAME,
     JENKINS_SERVICE_NAME,
@@ -47,29 +46,6 @@ def test_legacy_traefik_topology_remains_valid(mock_charm: MagicMock, monkeypatc
     charm_state = state.State.from_charm(mock_charm)
 
     assert charm_state.external_hostname is None
-
-
-def test_auth_proxy_traefik_and_haproxy_coexist(mock_charm: MagicMock, monkeypatch):
-    """Rollback topology: auth-proxy + traefik ingress + haproxy-route all related."""
-    monkeypatch.setattr(
-        mock_charm.model,
-        "get_relation",
-        _relations_mock(
-            {
-                AGENT_DISCOVERY_INGRESS_RELATION_NAME: MagicMock(),
-                INGRESS_RELATION_NAME: MagicMock(),
-                HAPROXY_ROUTE_RELATION_NAME: MagicMock(),
-                AUTH_PROXY_RELATION: MagicMock(),
-            }
-        ),
-    )
-    mock_charm.model.relations = {AGENT_RELATION: []}
-    mock_charm.config = {"external-hostname": "jenkins.example.com"}
-
-    charm_state = state.State.from_charm(mock_charm)
-
-    assert charm_state.auth_proxy_integrated is True
-    assert charm_state.external_hostname == "jenkins.example.com"
 
 
 def test_server_ingress_alone_is_valid(mock_charm: MagicMock, monkeypatch):

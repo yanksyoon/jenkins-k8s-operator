@@ -8,6 +8,11 @@ Each revision is versioned by the date of the revision.
 
 ## 2026-08-26
 
+- Remove the unsupported `auth-proxy` relation, OAuth2-proxy integration, and
+  automatic unsecured Jenkins mode. Existing deployments must migrate to an
+  external edge-authentication solution such as HAProxy SPOE/OIDC while keeping
+  Jenkins' own security realm enabled.
+
 - Reconcile a direct HAProxy server route while keeping machine-agent discovery on
   the dedicated ingress path.
 - Allow `agent-discovery-ingress` without a server `ingress` relation when a valid

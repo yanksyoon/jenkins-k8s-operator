@@ -44,6 +44,23 @@ The dedicated agent ingress is therefore required by the current direct-HAProxy
 server policy, not by Kubernetes networking in general. A future per-agent or
 Service-based endpoint contract could relax this requirement.
 
+## Migrate from the removed auth-proxy relation
+
+The Jenkins `auth-proxy` relation is no longer supported. Before refreshing an
+existing deployment, remove the relation and ensure Jenkins has an explicit
+secured JCasC configuration with administrator credentials:
+
+```text
+juju remove-relation jenkins-k8s:auth-proxy oathkeeper
+juju config jenkins-k8s external-hostname=jenkins.example.com
+juju integrate jenkins-k8s:haproxy-route haproxy
+```
+
+The default JCasC configuration keeps Jenkins' local security realm enabled.
+If your deployment supplied custom JCasC, keep its `securityRealm` and
+`authorizationStrategy` configuration explicit. Configure HAProxy SPOE/OIDC
+separately and validate it before removing the legacy ingress path.
+
 ## Prerequisites
 
 - An OIDC provider. For testing, a lightweight containerized provider (Dex, Keycloak,

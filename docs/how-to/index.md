@@ -24,8 +24,8 @@ Once your deployment is running, these guides cover day-to-day operations includ
 
 These guides cover identity and access management, and credential management to help you secure your Jenkins deployment.
 
-* [Integrate with IAM]
 * [Rotate credentials]
+* [Set up HAProxy SPOE/OIDC]
 
 ## Upgrade and redeployment
 
@@ -45,7 +45,7 @@ These guides provide instructions for upgrading your deployment and recovering f
 [Integrate with machine agents]: integrate-with-machine-agents.md
 [Resize Jenkins storage]: resize-jenkins-storage.md
 [Rotate credentials]: rotate-credentials.md
-[Integrate with IAM]: integrate-with-iam.md
+[Set up HAProxy SPOE/OIDC]: set-up-haproxy-spoe-oidc-auth.md
 [Backup and restore]: backup-and-restore-jenkins.md
 [Upgrade]: upgrade.md
 [Redeploy]: redeploy.md

@@ -214,7 +214,6 @@ def test__on_config_changed_success_replans_and_restarts(
             "_reconcile_agent_discovery",
             side_effect=lambda *_args: reconcile_order.append("agent-url"),
         ),
-        patch.object(jenkins_charm, "_reconcile_auth_proxy"),
         patch.object(jenkins_charm, "_reconcile_plugins"),
         patch.object(harness_container.container, "add_layer") as add_layer_mock,
         patch.object(harness_container.container, "replan") as replan_mock,
@@ -254,7 +253,6 @@ def test_reconcile_waiting_for_agent_ingress_continues_other_reconcile(
             side_effect=charm.ReconcileWaitingError("agent ingress is pending"),
         ),
         patch.object(jenkins_charm, "_reconcile_agent_discovery") as discovery_mock,
-        patch.object(jenkins_charm, "_reconcile_auth_proxy"),
         patch.object(jenkins_charm, "_reconcile_plugins") as plugins_mock,
     ):
         jenkins_charm._reconcile(MagicMock(spec=ops.ConfigChangedEvent))
@@ -551,7 +549,6 @@ def test_reconcile_calls_agent_reconciliation(harness_container: HarnessWithCont
         patch.object(jenkins_charm, "_reconcile_api_token"),
         patch.object(jenkins_charm, "_reconcile_agents") as reconcile_agents,
         patch.object(jenkins_charm, "_reconcile_agent_discovery"),
-        patch.object(jenkins_charm, "_reconcile_auth_proxy"),
         patch.object(jenkins_charm, "_reconcile_haproxy_route"),
         patch.object(jenkins_charm, "_reconcile_plugins"),
         patch.object(harness_container.container, "add_layer"),
