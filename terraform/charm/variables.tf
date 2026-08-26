@@ -55,6 +55,7 @@ variable "config" {
     jcasc_repository_branch      = optional(string)
     jcasc_environment_secrets    = optional(string)
     external_agent_nodes         = optional(string)
+    external_hostname            = optional(string)
   })
   default = {}
 }

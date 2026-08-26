@@ -40,6 +40,7 @@ module "jenkins-k8s" {
   #   system_properties = "jenkins.model.Jenkins.crumbIssuerProxyCompatibility=true"
   #   jcasc_repository  = "https://github.com/my-org/my-jcasc"
   #   external_agent_nodes = "external-agent-0,external-agent-1"
+  #   external_hostname = "jenkins.example.com" # managed HAProxy server route
   # }
 }
 ```
@@ -59,6 +60,7 @@ charm configuration options in `charmcraft.yaml`:
 | `jcasc_repository_branch`      | `jcasc-repository-branch`      |
 | `jcasc_environment_secrets`    | `jcasc-environment-secrets`    |
 | `external_agent_nodes`         | `external-agent-nodes`         |
+| `external_hostname`            | `external-hostname`            |
 
 The `jcasc_repository_token` and `jcasc_environment_secrets` options take a Juju
 user-secret URI. See
@@ -87,3 +89,8 @@ The complete list of available integrations can be found [in the Integrations ta
 [Terraform Juju provider]: https://registry.terraform.io/providers/juju/juju/latest
 [Juju]: https://juju.is
 [jenkins-k8s-integrations]: https://charmhub.io/jenkins-k8s/integrations
+
+When `external_hostname` is set, relate the module's `haproxy-route` endpoint to
+an HAProxy offer. Keep machine agents on the dedicated
+`agent-discovery-ingress` endpoint, for example through ingress-configurator and
+Gateway API; do not use the SPOE-protected HAProxy server endpoint for agents.

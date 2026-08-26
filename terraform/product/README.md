@@ -37,6 +37,29 @@ module "jenkins_k8s" {
 }
 ```
 
+The product module no longer deploys or integrates `oauth2-proxy-k8s`. Existing
+users must remove that application and its integrations, then configure their
+replacement edge authentication explicitly. For the revised Jenkins topology,
+set `external_hostname` in `jenkins_k8s.config` and integrate the exported
+`haproxy_route` endpoint with the managed HAProxy offer. Keep machine agents on
+the dedicated `agent_discovery_ingress` endpoint, using ingress-configurator and
+Gateway API when required.
+
+For example:
+
+```hcl
+module "jenkins_k8s" {
+  source = "git::https://github.com/canonical/jenkins-k8s-operator//terraform/product"
+
+  model = juju_model.my_model.name
+  jenkins_k8s = {
+    config = {
+      external_hostname = "jenkins.example.com"
+    }
+  }
+}
+```
+
 Create integrations, for instance:
 
 ```text

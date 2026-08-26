@@ -13,7 +13,11 @@ output "jenkins_agent_k8s_app_name" {
 
 output "jenkins_k8s_requires" {
   value = {
-    logging = "logging"
+    agent                   = "agent"
+    agent_discovery_ingress = "agent-discovery-ingress"
+    haproxy_route           = "haproxy-route"
+    ingress                 = "ingress"
+    logging                 = "logging"
   }
 }
 

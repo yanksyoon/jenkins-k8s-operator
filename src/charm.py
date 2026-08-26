@@ -20,7 +20,6 @@ import yaml
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.haproxy.v2.haproxy_route import HaproxyRouteRequirer
 from charms.loki_k8s.v0.loki_push_api import LogProxyConsumer
-from charms.oauth2_proxy_k8s.v0.auth_proxy import AuthProxyConfig, AuthProxyRequirer
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 
@@ -32,7 +31,6 @@ import timerange
 from state import (
     AGENT_DISCOVERY_INGRESS_RELATION_NAME,
     AGENT_RELATION,
-    AUTH_PROXY_RELATION,
     HAPROXY_ROUTE_RELATION_NAME,
     INGRESS_RELATION_NAME,
     JENKINS_SERVICE_NAME,
@@ -130,7 +128,6 @@ class JenkinsK8sOperatorCharm(ops.CharmBase):
             ],
         )
         self._grafana = GrafanaDashboardProvider(self)
-        self._auth_proxy = AuthProxyRequirer(self)
         self._haproxy_route = HaproxyRouteRequirer(
             self,
             relation_name=HAPROXY_ROUTE_RELATION_NAME,
@@ -151,8 +148,6 @@ class JenkinsK8sOperatorCharm(ops.CharmBase):
             self.agent_discovery_ingress.on.revoked,
             self.server_ingress.on.ready,
             self.server_ingress.on.revoked,
-            self.on[AUTH_PROXY_RELATION].relation_joined,
-            self.on[AUTH_PROXY_RELATION].relation_departed,
             self._haproxy_route.on.ready,
             self._haproxy_route.on.removed,
             self.on.update_status,
@@ -232,7 +227,7 @@ class JenkinsK8sOperatorCharm(ops.CharmBase):
 
         Reconcile runs in two phases: a blocking core workload path (storage,
         config, pebble, startup) followed by non-blocking integration reconcilers
-        (agents, auth proxy, plugins). The unit enters WaitingStatus when the
+        (agents, plugins). The unit enters WaitingStatus when the
         dedicated agent-discovery-ingress relation exists but has not published an
         endpoint yet.
         """
@@ -286,8 +281,6 @@ class JenkinsK8sOperatorCharm(ops.CharmBase):
         # other and must not block the core path; the agent pipeline defers with a
         # waiting message instead of failing reconciliation.
         agent_reconcile_waiting = self._reconcile_agent_pipeline(charm_state, client=admin_client)
-        logger.info("Reconciling auth proxy")
-        self._reconcile_auth_proxy(charm_state)
         logger.info("Reconciling plugins")
         self._reconcile_plugins(charm_state, admin_client, container)
 
@@ -429,15 +422,15 @@ class JenkinsK8sOperatorCharm(ops.CharmBase):
             logger.error(message)
             raise ReconcileBlockedError(message)
 
-        # Resolve the dedicated ingress URL before mutating Jenkins nodes or
-        # relation data. Never replace it with a stale pod address while the
-        # ingress-configurator is still converging.
-        agent_discovery_url = self._agent_discovery_url
         self.unit.status = ops.MaintenanceStatus("Reconciling agent nodes.")
         agent_nodes = client.list_agent_nodes()
         agent_node_names = [node.name for node in agent_nodes]
 
         if state.agent_relation_meta:
+            # Resolve the dedicated ingress URL before mutating Jenkins nodes or
+            # relation data. Never replace it with a stale pod address while the
+            # ingress-configurator is still converging.
+            agent_discovery_url = self._agent_discovery_url
             self._add_agent_nodes_from_relation(
                 agent_relation=state.agent_relation_meta,
                 agent_node_names=agent_node_names,
@@ -451,31 +444,6 @@ class JenkinsK8sOperatorCharm(ops.CharmBase):
             )
 
         self._remove_unmanaged_agents(
-             agent_node_names=agent_node_names,
-                api_client=client,
-            )
-            self._update_agent_nodes_from_relation(
-                agent_relation=state.agent_relation_meta,
-                agent_nodes=agent_nodes,
-                api_client=client,
-            )
-
-        self._remove_unmanaged_agents(
-=======
-        self._add_agent_nodes_from_relation(
-            agent_relation=state.agent_relation_meta,
-            agent_node_names=agent_node_names,
-            api_client=client,
-            agent_discovery_url=agent_discovery_url,
-        )
-        self._update_agent_nodes_from_relation(
-            agent_relation=state.agent_relation_meta,
-            agent_nodes=agent_nodes,
-            api_client=client,
-        )
-        self._remove_agent_nodes_not_in_relation(
-            agent_relation=state.agent_relation_meta,
->>>>>>> e77bd03 (feat: support direct HAProxy server routing)
             agent_node_names=agent_node_names,
             relation_agent_names=relation_agent_names,
             external_agent_nodes=external_agent_nodes,
@@ -524,27 +492,6 @@ class JenkinsK8sOperatorCharm(ops.CharmBase):
             if relation_discovery_url and relation_discovery_url == agent_discovery_url:
                 continue
             relation.data[self.model.unit].update({"url": agent_discovery_url})
-
-    def _reconcile_auth_proxy(self, state: State) -> None:
-        """Reconcile auth proxy configuration.
-
-        Args:
-            state: The current charm state.
-        """
-        if state.auth_proxy_integrated:
-            if self.server_ingress.url:
-                auth_proxy_config = AuthProxyConfig(
-                    protected_urls=[self.server_ingress.url],
-                    allowed_endpoints=[],
-                    headers=["X-Auth-Request-User"],
-                )
-            else:
-                auth_proxy_config = AuthProxyConfig(
-                    protected_urls=[],
-                    allowed_endpoints=[],
-                    headers=["X-Auth-Request-User"],
-                )
-            self._auth_proxy.update_auth_proxy_config(auth_proxy_config=auth_proxy_config)
 
     def _reconcile_haproxy_route(self, state: State) -> None:
         """Publish or retract haproxy-route requirements.
@@ -634,8 +581,8 @@ class JenkinsK8sOperatorCharm(ops.CharmBase):
             )
         if ingress_url := self.server_ingress.url:
             logger.warning(
-                "Using public ingress with protected endpoints (e.g. oathkeeper)"
-                "will result in agent discovery failure. Use %s for agents discovery.",
+                "Using server ingress without a dedicated agent route may"
+                " result in agent discovery failure. Use %s for agents discovery.",
                 AGENT_DISCOVERY_INGRESS_RELATION_NAME,
             )
             return ingress_url.rstrip("/")
@@ -773,7 +720,7 @@ class JenkinsK8sOperatorCharm(ops.CharmBase):
         """Reconcile JCasC configuration to desired state.
 
         Builds the desired JCasC config by merging user-provided config with
-        charm-managed sections (admin credentials, auth proxy), then delegates
+        charm-managed sections (admin credentials), then delegates
         file I/O, validation, and reload to jenkins.sync_jcasc_config.
 
         If jcasc-repository is set, fetches and merges YAML files from the repository.
@@ -845,7 +792,6 @@ class JenkinsK8sOperatorCharm(ops.CharmBase):
         desired_config = jenkins.build_jcasc_config(
             jcasc_config,
             charm_state.proxy_config,
-            charm_state.auth_proxy_integrated,
         )
         try:
             desired_yaml = yaml.dump(desired_config, default_flow_style=False, sort_keys=False)

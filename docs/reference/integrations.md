@@ -93,3 +93,20 @@ Grafana-dashboard integrate command:
 ```
 juju integrate jenkins-k8s:grafana-dashboard grafana-k8s:grafana-dashboard
 ```
+
+### `haproxy-route`
+
+_Interface_: haproxy-route
+_Supported providers_: [HAProxy](https://charmhub.io/haproxy)
+
+The `haproxy-route` relation exposes the Jenkins server through a managed
+HAProxy reverse proxy. Configure `external-hostname` on Jenkins before relating
+the endpoint. HAProxy may apply edge authentication such as SPOE/OIDC to the
+server hostname. Machine agents should use the separate `agent-discovery-ingress`
+route instead.
+
+Example integrate command:
+
+```
+juju integrate jenkins-k8s:haproxy-route haproxy:haproxy-route
+```
